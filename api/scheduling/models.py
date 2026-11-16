@@ -1,4 +1,25 @@
+import secrets
+
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import (
+    DateTimeRangeField,
+    RangeBoundary,
+    RangeOperators,
+)
 from django.db import models
+from django.db.models import F, Func, Q
+
+
+class TsTzRange(Func):
+    function = "TSTZRANGE"
+    output_field = DateTimeRangeField()
+
+
+BOOKING_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def generate_booking_code():
+    return "".join(secrets.choice(BOOKING_CODE_ALPHABET) for _ in range(8))
 
 
 class Service(models.Model):
@@ -29,3 +50,55 @@ class Provider(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Booking(models.Model):
+    class Status(models.TextChoices):
+        BOOKED = "booked", "Booked"
+        CHECKED_IN = "checked_in", "Checked in"
+        IN_PROGRESS = "in_progress", "In progress"
+        DONE = "done", "Done"
+        CANCELLED = "cancelled", "Cancelled"
+        NO_SHOW = "no_show", "No show"
+
+    code = models.CharField(
+        max_length=8, unique=True, default=generate_booking_code, editable=False
+    )
+    provider = models.ForeignKey(
+        Provider, on_delete=models.PROTECT, related_name="bookings"
+    )
+    service = models.ForeignKey(
+        Service, on_delete=models.PROTECT, related_name="bookings"
+    )
+    start_at = models.DateTimeField()
+    end_at = models.DateTimeField()
+    patient_name = models.CharField(max_length=100)
+    patient_phone = models.CharField(max_length=30)
+    patient_email = models.EmailField(blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.BOOKED
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["start_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(end_at__gt=F("start_at")),
+                name="booking_end_after_start",
+            ),
+            ExclusionConstraint(
+                name="booking_no_overlap_per_provider",
+                expressions=[
+                    (
+                        TsTzRange("start_at", "end_at", RangeBoundary()),
+                        RangeOperators.OVERLAPS,
+                    ),
+                    ("provider", RangeOperators.EQUAL),
+                ],
+                condition=Q(status__in=["booked", "checked_in", "in_progress", "done"]),
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.code} {self.patient_name} with {self.provider}"

@@ -26,6 +26,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "accounts",
     "scheduling",
+    "django.contrib.postgres",
+      
 ]
 
 MIDDLEWARE = [

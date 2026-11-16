@@ -102,3 +102,36 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"{self.code} {self.patient_name} with {self.provider}"
+
+class WorkingHours(models.Model):
+    class Weekday(models.IntegerChoices):
+        MONDAY = 0, "Monday"
+        TUESDAY = 1, "Tuesday"
+        WEDNESDAY = 2, "Wednesday"
+        THURSDAY = 3, "Thursday"
+        FRIDAY = 4, "Friday"
+        SATURDAY = 5, "Saturday"
+        SUNDAY = 6, "Sunday"
+
+    provider = models.ForeignKey(
+        Provider, on_delete=models.CASCADE, related_name="working_hours"
+    )
+    weekday = models.PositiveSmallIntegerField(choices=Weekday.choices)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+
+    class Meta:
+        ordering = ["provider", "weekday", "start_time"]
+        verbose_name_plural = "working hours"
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(end_time__gt=F("start_time")),
+                name="working_hours_end_after_start",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.provider} {self.get_weekday_display()} "
+            f"{self.start_time:%H:%M}-{self.end_time:%H:%M}"
+        )

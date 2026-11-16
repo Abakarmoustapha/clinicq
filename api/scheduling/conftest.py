@@ -1,8 +1,14 @@
 from datetime import time
 
 import pytest
+from django.core.cache import cache
 
 from .models import Provider, Service, WorkingHours
+
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    cache.clear()
 
 
 @pytest.fixture

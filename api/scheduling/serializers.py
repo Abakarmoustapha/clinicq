@@ -1,6 +1,8 @@
+import re
+
 from rest_framework import serializers
 
-from .models import Provider, Service
+from .models import Booking, Provider, Service
 
 
 class ServiceSerializer(serializers.ModelSerializer):
@@ -23,3 +25,33 @@ class FreeSlotsQuerySerializer(serializers.Serializer):
         queryset=Service.objects.filter(is_active=True)
     )
     date = serializers.DateField()
+
+
+class BookingCreateSerializer(serializers.Serializer):
+    provider = serializers.PrimaryKeyRelatedField(
+        queryset=Provider.objects.filter(is_active=True)
+    )
+    service = serializers.PrimaryKeyRelatedField(
+        queryset=Service.objects.filter(is_active=True)
+    )
+    start_at = serializers.DateTimeField()
+    patient_name = serializers.CharField(max_length=100)
+    patient_phone = serializers.CharField(max_length=30)
+    patient_email = serializers.EmailField(required=False, allow_blank=True, default="")
+
+    def validate_patient_phone(self, value):
+        phone = re.sub(r"[ \-]", "", value)
+        if not re.fullmatch(r"\+?[0-9]{8,15}", phone):
+            raise serializers.ValidationError(
+                "Enter a valid phone number, for example +23566123456."
+            )
+        return phone
+
+
+class BookingSerializer(serializers.ModelSerializer):
+    provider = serializers.CharField(source="provider.name", read_only=True)
+    service = serializers.CharField(source="service.name", read_only=True)
+
+    class Meta:
+        model = Booking
+        fields = ["code", "status", "start_at", "end_at", "provider", "service"]

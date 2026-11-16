@@ -89,9 +89,10 @@ def test_missing_name_gives_400(client, provider, service):
 
 def test_unknown_provider_gives_400(client, provider, service):
     start = first_slot(client, provider, service)
-    response = post(client, payload(provider, service, start, provider=9999))
+    data = payload(provider, service, start)
+    data["provider"] = 9999
+    response = post(client, data)
     assert response.status_code == 400
-
 
 def test_booking_can_be_looked_up_by_code(client, provider, service):
     start = first_slot(client, provider, service)

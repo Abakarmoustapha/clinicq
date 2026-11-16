@@ -1,27 +1,40 @@
 from datetime import timedelta
 
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.generics import ListAPIView
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .availability import get_free_slots
-from .bookings import MAX_DAYS_AHEAD
-from .models import Provider, Service
+from .bookings import MAX_DAYS_AHEAD, SlotUnavailable, TooFarAhead, create_booking
+from .models import Booking, Provider, Service
 from .serializers import (
+    BookingCreateSerializer,
+    BookingSerializer,
     FreeSlotsQuerySerializer,
     ProviderSerializer,
     ServiceSerializer,
 )
 
 
-class ServiceListView(ListAPIView):
+class PublicMixin:
+    """Endpoints open to everyone on purpose: no login and no session."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+
+class ServiceListView(PublicMixin, ListAPIView):
     serializer_class = ServiceSerializer
     queryset = Service.objects.filter(is_active=True)
     pagination_class = None
 
 
-class ProviderListView(ListAPIView):
+class ProviderListView(PublicMixin, ListAPIView):
     serializer_class = ProviderSerializer
     pagination_class = None
 
@@ -35,7 +48,7 @@ class ProviderListView(ListAPIView):
         return providers
 
 
-class FreeSlotsView(APIView):
+class FreeSlotsView(PublicMixin, APIView):
     def get(self, request):
         query = FreeSlotsQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
@@ -53,3 +66,37 @@ class FreeSlotsView(APIView):
                 {"start_at": local.isoformat(), "time": local.strftime("%H:%M")}
             )
         return Response({"date": day.isoformat(), "slots": slots})
+
+class BookingCreateView(PublicMixin, APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "booking_create"
+
+    def post(self, request):
+        data = BookingCreateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        values = data.validated_data
+        try:
+            booking = create_booking(
+                provider=values["provider"],
+                service=values["service"],
+                start_at=values["start_at"],
+                patient_name=values["patient_name"],
+                patient_phone=values["patient_phone"],
+                patient_email=values["patient_email"],
+            )
+        except SlotUnavailable as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except TooFarAhead as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
+
+
+class BookingDetailView(PublicMixin, APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "booking_lookup"
+
+    def get(self, request, code):
+        booking = get_object_or_404(
+            Booking.objects.select_related("provider", "service"), code=code.upper()
+        )
+        return Response(BookingSerializer(booking).data)

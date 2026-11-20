@@ -5,6 +5,15 @@ from rest_framework import serializers
 from .models import Booking, Provider, Service
 
 
+def clean_phone(value):
+    phone = re.sub(r"[ \-]", "", value)
+    if not re.fullmatch(r"\+?[0-9]{8,15}", phone):
+        raise serializers.ValidationError(
+            "Enter a valid phone number, for example +23566123456."
+        )
+    return phone
+
+
 class ServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
@@ -40,12 +49,14 @@ class BookingCreateSerializer(serializers.Serializer):
     patient_email = serializers.EmailField(required=False, allow_blank=True, default="")
 
     def validate_patient_phone(self, value):
-        phone = re.sub(r"[ \-]", "", value)
-        if not re.fullmatch(r"\+?[0-9]{8,15}", phone):
-            raise serializers.ValidationError(
-                "Enter a valid phone number, for example +23566123456."
-            )
-        return phone
+        return clean_phone(value)
+
+
+class BookingCancelSerializer(serializers.Serializer):
+    patient_phone = serializers.CharField(max_length=30)
+
+    def validate_patient_phone(self, value):
+        return clean_phone(value)
 
 
 class BookingSerializer(serializers.ModelSerializer):

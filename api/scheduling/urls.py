@@ -8,4 +8,9 @@ urlpatterns = [
     path("slots/", views.FreeSlotsView.as_view(), name="free-slots"),
     path("bookings/", views.BookingCreateView.as_view(), name="booking-create"),
     path("bookings/<str:code>/", views.BookingDetailView.as_view(), name="booking-detail"),
+    path(
+        "bookings/<str:code>/cancel/",
+        views.BookingCancelView.as_view(),
+        name="booking-cancel",
+    ),
 ]

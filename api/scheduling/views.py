@@ -10,9 +10,18 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .availability import get_free_slots
-from .bookings import MAX_DAYS_AHEAD, SlotUnavailable, TooFarAhead, create_booking
+from .bookings import (
+    MAX_DAYS_AHEAD,
+    BookingNotFound,
+    NotCancellable,
+    SlotUnavailable,
+    TooFarAhead,
+    cancel_booking,
+    create_booking,
+)
 from .models import Booking, Provider, Service
 from .serializers import (
+    BookingCancelSerializer,
     BookingCreateSerializer,
     BookingSerializer,
     FreeSlotsQuerySerializer,
@@ -67,6 +76,7 @@ class FreeSlotsView(PublicMixin, APIView):
             )
         return Response({"date": day.isoformat(), "slots": slots})
 
+
 class BookingCreateView(PublicMixin, APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "booking_create"
@@ -99,4 +109,22 @@ class BookingDetailView(PublicMixin, APIView):
         booking = get_object_or_404(
             Booking.objects.select_related("provider", "service"), code=code.upper()
         )
+        return Response(BookingSerializer(booking).data)
+
+
+class BookingCancelView(PublicMixin, APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "booking_cancel"
+
+    def post(self, request, code):
+        data = BookingCancelSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        try:
+            booking = cancel_booking(code, data.validated_data["patient_phone"])
+        except BookingNotFound:
+            return Response(
+                {"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        except NotCancellable as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         return Response(BookingSerializer(booking).data)

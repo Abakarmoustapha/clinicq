@@ -95,6 +95,6 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {
         "booking_create": "10/hour",
-        "booking_lookup": "60/hour",
+        "booking_lookup": "60/hour",                "booking_cancel": "10/hour",
     },
 }

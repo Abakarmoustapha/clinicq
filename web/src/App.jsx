@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getJson } from './api'
+import BookingForm from './BookingForm'
 
 function toIso(d) {
   const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -10,6 +11,14 @@ function toIso(d) {
 const TODAY = new Date()
 const LAST_DAY = new Date()
 LAST_DAY.setDate(LAST_DAY.getDate() + 30)
+
+const pageStyle = {
+  maxWidth: 520,
+  margin: '2rem auto',
+  padding: '0 1rem',
+  fontFamily: 'sans-serif',
+  textAlign: 'left',
+}
 
 function choiceStyle(active) {
   return {
@@ -32,6 +41,9 @@ function App() {
   const [date, setDate] = useState(toIso(TODAY))
   const [slots, setSlots] = useState(null)
   const [slot, setSlot] = useState(null)
+  const [refresh, setRefresh] = useState(0)
+  const [notice, setNotice] = useState('')
+  const [confirmation, setConfirmation] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -76,11 +88,12 @@ function App() {
     return () => {
       ignore = true
     }
-  }, [service, provider, date])
+  }, [service, provider, date, refresh])
 
   function chooseService(selected) {
     if (service?.id === selected.id) return
     setError('')
+    setNotice('')
     setService(selected)
     setProviders(null)
     setProvider(null)
@@ -91,6 +104,7 @@ function App() {
   function chooseProvider(selected) {
     if (provider?.id === selected.id) return
     setError('')
+    setNotice('')
     setProvider(selected)
     setSlots(null)
     setSlot(null)
@@ -99,21 +113,73 @@ function App() {
   function changeDate(value) {
     if (!value || value === date) return
     setError('')
+    setNotice('')
     setDate(value)
     setSlots(null)
     setSlot(null)
   }
 
+  function chooseSlot(selected) {
+    setNotice('')
+    setSlot(selected)
+  }
+
+  function handleSlotTaken(message) {
+    setNotice(message)
+    setSlot(null)
+    setSlots(null)
+    setRefresh((n) => n + 1)
+  }
+
+  function handleBooked(booking) {
+    setConfirmation({
+      code: booking.code,
+      service: booking.service,
+      provider: booking.provider,
+      date,
+      time: slot.time,
+    })
+  }
+
+  function startOver() {
+    setService(null)
+    setProviders(null)
+    setProvider(null)
+    setDate(toIso(TODAY))
+    setSlots(null)
+    setSlot(null)
+    setNotice('')
+    setError('')
+    setConfirmation(null)
+  }
+
+  if (confirmation) {
+    return (
+      <main style={pageStyle}>
+        <h1>ClinicQ</h1>
+        <h2>Booking confirmed</h2>
+        <p>Your booking code is:</p>
+        <p style={{ fontSize: '2rem', fontWeight: 'bold', letterSpacing: '0.2rem' }}>
+          {confirmation.code}
+        </p>
+        <p>
+          {confirmation.service} with {confirmation.provider}
+          <br />
+          {confirmation.date} at {confirmation.time}
+        </p>
+        <p>
+          <strong>Write this code down.</strong> You need it, with your phone number,
+          to cancel or to follow your place in the queue.
+        </p>
+        <button style={choiceStyle(true)} onClick={startOver}>
+          Make another booking
+        </button>
+      </main>
+    )
+  }
+
   return (
-    <main
-      style={{
-        maxWidth: 520,
-        margin: '2rem auto',
-        padding: '0 1rem',
-        fontFamily: 'sans-serif',
-        textAlign: 'left',
-      }}
-    >
+    <main style={pageStyle}>
       <h1>ClinicQ</h1>
       {error && <p style={{ color: 'crimson' }}>Something went wrong: {error}</p>}
 
@@ -161,6 +227,7 @@ function App() {
           />
 
           <h2>4. Choose a time</h2>
+          {notice && <p style={{ color: '#b45309' }}>{notice} Please choose another time.</p>}
           {slots === null && <p>Loading...</p>}
           {slots && slots.length === 0 && (
             <p>No free times on this day. Try another day.</p>
@@ -170,7 +237,7 @@ function App() {
               <button
                 key={s.start_at}
                 style={choiceStyle(slot?.start_at === s.start_at)}
-                onClick={() => setSlot(s)}
+                onClick={() => chooseSlot(s)}
               >
                 {s.time}
               </button>
@@ -179,12 +246,14 @@ function App() {
       )}
 
       {slot && (
-        <p style={{ marginTop: '1rem' }}>
-          <strong>
-            You chose {slot.time} on {date} with {provider.name}.
-          </strong>{' '}
-          The booking form comes in the next step.
-        </p>
+        <BookingForm
+          provider={provider}
+          service={service}
+          slot={slot}
+          date={date}
+          onBooked={handleBooked}
+          onSlotTaken={handleSlotTaken}
+        />
       )}
     </main>
   )

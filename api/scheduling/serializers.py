@@ -4,6 +4,19 @@ from rest_framework import serializers
 
 from .models import Booking, Provider, Service
 
+DIGIT_RUN = "01234567890123456789"
+
+
+def clean_name(value):
+    name = " ".join(value.split())
+    letters = sum(ch.isalpha() for ch in name)
+    allowed = all(ch.isalpha() or ch in " '.-" for ch in name)
+    if letters < 2 or not allowed:
+        raise serializers.ValidationError(
+            "Enter your real name, using letters only."
+        )
+    return name
+
 
 def clean_phone(value):
     phone = re.sub(r"[ \-]", "", value)
@@ -11,6 +24,9 @@ def clean_phone(value):
         raise serializers.ValidationError(
             "Enter a valid phone number, for example +23566123456."
         )
+    digits = phone.lstrip("+")
+    if len(set(digits)) == 1 or digits in DIGIT_RUN or digits[::-1] in DIGIT_RUN:
+        raise serializers.ValidationError("Enter your real phone number.")
     return phone
 
 
@@ -47,6 +63,9 @@ class BookingCreateSerializer(serializers.Serializer):
     patient_name = serializers.CharField(max_length=100)
     patient_phone = serializers.CharField(max_length=30)
     patient_email = serializers.EmailField(required=False, allow_blank=True, default="")
+
+    def validate_patient_name(self, value):
+        return clean_name(value)
 
     def validate_patient_phone(self, value):
         return clean_phone(value)

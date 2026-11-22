@@ -14,7 +14,13 @@ SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = []
+# Comma-separated website names, for example "clinicq.example.com,www.clinicq.example.com".
+# While DEBUG is on, Django also allows localhost by itself.
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -27,7 +33,6 @@ INSTALLED_APPS = [
     "accounts",
     "scheduling",
     "django.contrib.postgres",
-      
 ]
 
 MIDDLEWARE = [
@@ -95,6 +100,27 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {
         "booking_create": "10/hour",
-        "booking_lookup": "60/hour",                "booking_cancel": "10/hour",
+        "booking_lookup": "60/hour",
+        "booking_cancel": "10/hour",
     },
 }
+
+# --- Security for real deployment -------------------------------------------
+# These switch on only when DEBUG is off, so local development keeps working.
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # HSTS tells browsers to use https only. Start small (1 hour) and raise it
+    # step by step once https works everywhere: browsers remember this setting.
+    SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_HSTS_SECONDS", "3600"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+
+    # Set DJANGO_BEHIND_PROXY=True only when a proxy that you control handles
+    # https and always overwrites this header. Otherwise attackers could fake it.
+    if os.environ.get("DJANGO_BEHIND_PROXY") == "True":
+        SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# We do not join the browser "preload list" yet: it is very hard to undo.
+SILENCED_SYSTEM_CHECKS = ["security.W021"]

@@ -94,7 +94,14 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Staff sessions end 8 hours after login.
+SESSION_COOKIE_AGE = 8 * 60 * 60
+
 REST_FRAMEWORK = {
+    # Only the session cookie logs people in. Basic authentication is switched off.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
@@ -102,6 +109,7 @@ REST_FRAMEWORK = {
         "booking_create": "10/hour",
         "booking_lookup": "60/hour",
         "booking_cancel": "10/hour",
+        "login": "30/hour",
     },
 }
 

@@ -28,3 +28,7 @@ class IsFrontDesk(HasRole):
 
 class IsProviderRole(HasRole):
     allowed_roles = (User.Role.PROVIDER,)
+
+
+class IsAnyStaff(HasRole):
+    allowed_roles = (User.Role.ADMIN, User.Role.RECEPTIONIST, User.Role.PROVIDER)

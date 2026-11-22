@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import staff_views, views
 
 urlpatterns = [
     path("services/", views.ServiceListView.as_view(), name="service-list"),
@@ -12,5 +12,20 @@ urlpatterns = [
         "bookings/<str:code>/cancel/",
         views.BookingCancelView.as_view(),
         name="booking-cancel",
+    ),
+    path(
+        "staff/bookings/",
+        staff_views.StaffBookingListView.as_view(),
+        name="staff-booking-list",
+    ),
+    path(
+        "staff/bookings/<str:code>/check-in/",
+        staff_views.CheckInView.as_view(),
+        name="staff-check-in",
+    ),
+    path(
+        "staff/bookings/<str:code>/no-show/",
+        staff_views.NoShowView.as_view(),
+        name="staff-no-show",
     ),
 ]

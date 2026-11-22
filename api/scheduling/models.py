@@ -1,5 +1,6 @@
 import secrets
 
+from django.conf import settings
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import (
     DateTimeRangeField,
@@ -44,6 +45,14 @@ class Provider(models.Model):
     name = models.CharField(max_length=100)
     services = models.ManyToManyField(Service, related_name="providers", blank=True)
     is_active = models.BooleanField(default=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="provider_profile",
+        limit_choices_to={"role": "provider"},
+    )
 
     class Meta:
         ordering = ["name"]
@@ -102,6 +111,7 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"{self.code} {self.patient_name} with {self.provider}"
+
 
 class WorkingHours(models.Model):
     class Weekday(models.IntegerChoices):

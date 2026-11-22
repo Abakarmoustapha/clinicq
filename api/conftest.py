@@ -9,6 +9,12 @@ def no_https_redirect_in_tests(settings):
 
 
 @pytest.fixture(autouse=True)
+def fast_password_hashing(settings):
+    # Real password hashing is slow on purpose. Tests don't need that protection.
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
+@pytest.fixture(autouse=True)
 def clear_cache():
     # Rate limits remember requests in the cache, so every test starts clean.
     cache.clear()

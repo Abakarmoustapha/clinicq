@@ -28,4 +28,9 @@ urlpatterns = [
         staff_views.NoShowView.as_view(),
         name="staff-no-show",
     ),
+    path(
+        "staff/walk-ins/",
+        staff_views.WalkInCreateView.as_view(),
+        name="staff-walk-in",
+    ),
 ]

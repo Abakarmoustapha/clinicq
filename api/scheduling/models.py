@@ -87,6 +87,10 @@ class Booking(models.Model):
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.BOOKED
     )
+    # A walk-in has no reserved slot: they join the queue when they arrive.
+    is_walk_in = models.BooleanField(default=False)
+    # When the patient arrived. The queue is ordered by this time.
+    checked_in_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -96,6 +100,8 @@ class Booking(models.Model):
                 condition=Q(end_at__gt=F("start_at")),
                 name="booking_end_after_start",
             ),
+            # Reserved slots of one provider may never overlap.
+            # Walk-ins do not reserve a slot, so the rule does not apply to them.
             ExclusionConstraint(
                 name="booking_no_overlap_per_provider",
                 expressions=[
@@ -105,7 +111,10 @@ class Booking(models.Model):
                     ),
                     ("provider", RangeOperators.EQUAL),
                 ],
-                condition=Q(status__in=["booked", "checked_in", "in_progress", "done"]),
+                condition=Q(
+                    status__in=["booked", "checked_in", "in_progress", "done"],
+                    is_walk_in=False,
+                ),
             ),
         ]
 

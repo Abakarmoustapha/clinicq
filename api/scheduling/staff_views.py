@@ -8,8 +8,19 @@ from rest_framework.views import APIView
 from accounts.permissions import IsAnyStaff, IsFrontDesk
 
 from .bookings import BookingNotFound
-from .staff_serializers import StaffBookingSerializer, StaffListQuerySerializer
-from .staff_services import InvalidTransition, bookings_for, check_in, mark_no_show
+from .staff_serializers import (
+    StaffBookingSerializer,
+    StaffListQuerySerializer,
+    WalkInSerializer,
+)
+from .staff_services import (
+    InvalidTransition,
+    WalkInNotPossible,
+    bookings_for,
+    check_in,
+    create_walk_in,
+    mark_no_show,
+)
 
 
 class StaffBookingListView(APIView):
@@ -59,3 +70,18 @@ class NoShowView(APIView):
 
     def post(self, request, code):
         return run_action(request, code, mark_no_show)
+
+
+class WalkInCreateView(APIView):
+    permission_classes = [IsFrontDesk]
+
+    def post(self, request):
+        data = WalkInSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        try:
+            booking = create_walk_in(**data.validated_data)
+        except WalkInNotPossible as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return Response(
+            StaffBookingSerializer(booking).data, status=status.HTTP_201_CREATED
+        )

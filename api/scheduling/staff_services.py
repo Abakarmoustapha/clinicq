@@ -6,13 +6,17 @@ from django.utils import timezone
 from accounts.models import User
 
 from .bookings import BookingError, BookingNotFound
-from .models import Booking
+from .models import Booking, WorkingHours
 
 NO_SHOW_GRACE_MINUTES = 15
 
 
 class InvalidTransition(BookingError):
     """The booking is not in a state where this action is allowed."""
+
+
+class WalkInNotPossible(BookingError):
+    """A walk-in cannot be added for this provider or service."""
 
 
 def bookings_for(user):
@@ -41,7 +45,8 @@ def check_in(queryset, code, now=None):
                 "Patients can only be checked in on the day of their booking."
             )
         booking.status = Booking.Status.CHECKED_IN
-        booking.save(update_fields=["status"])
+        booking.checked_in_at = now
+        booking.save(update_fields=["status", "checked_in_at"])
     return booking
 
 
@@ -62,3 +67,28 @@ def mark_no_show(queryset, code, now=None):
         booking.status = Booking.Status.NO_SHOW
         booking.save(update_fields=["status"])
     return booking
+
+
+def create_walk_in(
+    provider, service, patient_name, patient_phone, patient_email="", now=None
+):
+    now = now or timezone.now()
+    if not provider.is_active or not service.is_active:
+        raise WalkInNotPossible("This provider or service is not available.")
+    if not provider.services.filter(pk=service.pk).exists():
+        raise WalkInNotPossible("This provider does not offer this service.")
+    weekday = timezone.localtime(now).weekday()
+    if not WorkingHours.objects.filter(provider=provider, weekday=weekday).exists():
+        raise WalkInNotPossible("This provider is not working today.")
+    return Booking.objects.create(
+        provider=provider,
+        service=service,
+        start_at=now,
+        end_at=now + timedelta(minutes=service.slot_minutes),
+        patient_name=patient_name,
+        patient_phone=patient_phone,
+        patient_email=patient_email,
+        status=Booking.Status.CHECKED_IN,
+        is_walk_in=True,
+        checked_in_at=now,
+    )

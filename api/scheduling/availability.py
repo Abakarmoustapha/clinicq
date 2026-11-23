@@ -20,9 +20,11 @@ def get_free_slots(provider, service, day, now=None):
     day_start = timezone.make_aware(datetime.combine(day, time.min))
     day_end = day_start + timedelta(days=1)
 
+    # Walk-ins do not reserve a slot, so they never remove one from the list.
     busy = list(
         Booking.objects.filter(
             provider=provider,
+            is_walk_in=False,
             status__in=OCCUPYING_STATUSES,
             start_at__lt=day_end,
             end_at__gt=day_start,

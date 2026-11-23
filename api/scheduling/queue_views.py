@@ -1,7 +1,6 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from accounts.models import User
@@ -13,6 +12,7 @@ from .queue_services import call_next, finish, provider_of, queue_status, todays
 from .serializers import BookingSerializer
 from .staff_serializers import StaffBookingSerializer
 from .staff_services import InvalidTransition, bookings_for
+from .throttles import BookingCodeThrottle, QueueIpThrottle
 from .views import PublicMixin
 
 NO_PROFILE = {"detail": "This account is not linked to a provider."}
@@ -83,8 +83,7 @@ class DoneView(APIView):
 class BookingQueueView(PublicMixin, APIView):
     """What a patient sees about their place in the queue. No personal data."""
 
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "booking_lookup"
+    throttle_classes = [BookingCodeThrottle, QueueIpThrottle]
 
     def get(self, request, code):
         booking = get_object_or_404(

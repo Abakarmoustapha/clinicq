@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getResult, postJson } from './api'
+
+const POLL_MS = 30000
+const LIVE_STATUSES = ['checked_in', 'in_progress']
 
 const pageStyle = {
   maxWidth: 520,
@@ -17,6 +20,13 @@ const fieldStyle = {
   marginTop: '0.25rem',
 }
 const errorStyle = { color: 'crimson', margin: '0.25rem 0 0.75rem' }
+const noteStyle = { color: '#555', fontSize: '0.9rem', margin: '0.25rem 0' }
+const queueBoxStyle = {
+  background: '#eef2ff',
+  borderRadius: 8,
+  padding: '0.75rem 1rem',
+  margin: '0.75rem 0',
+}
 
 function buttonStyle(color, busy) {
   return {
@@ -59,6 +69,48 @@ function ManageBooking() {
   const [confirming, setConfirming] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelMessage, setCancelMessage] = useState('')
+  const [liveNote, setLiveNote] = useState('')
+
+  const bookingCode = booking ? booking.code : null
+  const isLive = booking ? LIVE_STATUSES.includes(booking.status) : false
+
+  // While the patient is waiting, ask the server for fresh numbers every 30 seconds.
+  useEffect(() => {
+    if (!bookingCode || !isLive) return undefined
+    let stopped = false
+
+    async function refresh() {
+      if (document.hidden) return
+      try {
+        const result = await getResult(
+          `/api/bookings/${encodeURIComponent(bookingCode)}/queue/`,
+        )
+        if (stopped) return
+        if (result.ok) {
+          setBooking(result.body)
+          setLiveNote('')
+        } else if (result.status === 429) {
+          setLiveNote('Updates are paused for a while. Please try again later.')
+        } else {
+          setLiveNote('Could not refresh. We will try again.')
+        }
+      } catch {
+        if (!stopped) setLiveNote('No connection. We will try again.')
+      }
+    }
+
+    function refreshWhenVisible() {
+      if (!document.hidden) refresh()
+    }
+
+    const timer = setInterval(refresh, POLL_MS)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      stopped = true
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [bookingCode, isLive])
 
   function resetCancel() {
     setPhone('')
@@ -73,10 +125,11 @@ function ManageBooking() {
     if (!clean || looking) return
     setLooking(true)
     setMessage('')
+    setLiveNote('')
     setBooking(null)
     resetCancel()
     try {
-      const result = await getResult(`/api/bookings/${encodeURIComponent(clean)}/`)
+      const result = await getResult(`/api/bookings/${encodeURIComponent(clean)}/queue/`)
       if (result.ok) {
         setBooking(result.body)
       } else if (result.status === 404) {
@@ -114,7 +167,13 @@ function ManageBooking() {
         { patient_phone: phone.trim() },
       )
       if (result.ok) {
-        setBooking(result.body)
+        setBooking({
+          ...booking,
+          ...result.body,
+          position: null,
+          people_ahead: null,
+          estimated_wait_minutes: null,
+        })
         setConfirming(false)
       } else if (result.status === 400 && result.body?.patient_phone) {
         setPhoneError([].concat(result.body.patient_phone).join(' '))
@@ -181,6 +240,37 @@ function ManageBooking() {
           <p>
             <strong>Status:</strong> {STATUS_TEXT[booking.status] || booking.status}
           </p>
+
+          {booking.status === 'checked_in' && booking.people_ahead !== null && (
+            <div style={queueBoxStyle} aria-live="polite">
+              <p style={{ margin: 0, fontWeight: 'bold' }}>
+                {booking.people_ahead === 0
+                  ? 'You are next.'
+                  : booking.people_ahead === 1
+                    ? '1 person is ahead of you.'
+                    : `${booking.people_ahead} people are ahead of you.`}
+              </p>
+              {booking.people_ahead > 0 && (
+                <p style={{ margin: '0.25rem 0 0' }}>
+                  Estimated wait: about {booking.estimated_wait_minutes} minutes. This is
+                  only an estimate.
+                </p>
+              )}
+            </div>
+          )}
+
+          {booking.status === 'in_progress' && (
+            <div style={queueBoxStyle} aria-live="polite">
+              <p style={{ margin: 0, fontWeight: 'bold' }}>
+                It is your turn. Please go to {booking.provider}.
+              </p>
+            </div>
+          )}
+
+          {booking.status === 'done' && <p>Your visit is finished. Thank you.</p>}
+
+          {isLive && <p style={noteStyle}>This page updates by itself every 30 seconds.</p>}
+          {liveNote && <p style={noteStyle}>{liveNote}</p>}
 
           {booking.status === 'cancelled' && (
             <p>This booking is cancelled. The time is free for other patients.</p>

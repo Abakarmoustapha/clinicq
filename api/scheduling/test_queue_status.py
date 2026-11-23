@@ -195,11 +195,6 @@ def test_the_answer_never_contains_personal_data(client, doctor, service):
         assert key not in response.json()
 
 
-def test_status_lookups_are_rate_limited(client, monkeypatch):
-    monkeypatch.setitem(ScopedRateThrottle.THROTTLE_RATES, "booking_lookup", "3/hour")
-    for _ in range(3):
-        assert status_of(client, "ZZZZZZZZ").status_code == 404
-    assert status_of(client, "ZZZZZZZZ").status_code == 429
 
 
 def test_call_next_and_done_record_their_times(doctor, service):

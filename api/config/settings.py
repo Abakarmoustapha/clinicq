@@ -110,6 +110,8 @@ REST_FRAMEWORK = {
         "booking_lookup": "60/hour",
         "booking_cancel": "10/hour",
         "login": "30/hour",
+        "queue_per_code": "240/hour",
+        "queue_ip": "3000/hour",
     },
 }
 

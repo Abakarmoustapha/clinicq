@@ -14,6 +14,11 @@ urlpatterns = [
         name="booking-cancel",
     ),
     path(
+        "bookings/<str:code>/queue/",
+        queue_views.BookingQueueView.as_view(),
+        name="booking-queue",
+    ),
+    path(
         "staff/bookings/",
         staff_views.StaffBookingListView.as_view(),
         name="staff-booking-list",

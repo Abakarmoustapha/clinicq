@@ -1,15 +1,19 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from accounts.models import User
 from accounts.permissions import IsAnyStaff, IsProviderRole
 
 from .bookings import BookingNotFound
-from .models import Provider
-from .queue_services import call_next, finish, provider_of, todays_queue
+from .models import Booking, Provider
+from .queue_services import call_next, finish, provider_of, queue_status, todays_queue
+from .serializers import BookingSerializer
 from .staff_serializers import StaffBookingSerializer
 from .staff_services import InvalidTransition, bookings_for
+from .views import PublicMixin
 
 NO_PROFILE = {"detail": "This account is not linked to a provider."}
 
@@ -74,3 +78,16 @@ class DoneView(APIView):
         except InvalidTransition as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         return Response(StaffBookingSerializer(booking).data)
+
+
+class BookingQueueView(PublicMixin, APIView):
+    """What a patient sees about their place in the queue. No personal data."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "booking_lookup"
+
+    def get(self, request, code):
+        booking = get_object_or_404(
+            Booking.objects.select_related("provider", "service"), code=code.upper()
+        )
+        return Response({**BookingSerializer(booking).data, **queue_status(booking)})

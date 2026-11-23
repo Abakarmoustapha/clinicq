@@ -91,6 +91,9 @@ class Booking(models.Model):
     is_walk_in = models.BooleanField(default=False)
     # When the patient arrived. The queue is ordered by this time.
     checked_in_at = models.DateTimeField(null=True, blank=True)
+    # When the provider called the patient, and when the consultation ended.
+    called_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

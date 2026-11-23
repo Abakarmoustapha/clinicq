@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import staff_views, views
+from . import queue_views, staff_views, views
 
 urlpatterns = [
     path("services/", views.ServiceListView.as_view(), name="service-list"),
@@ -29,8 +29,19 @@ urlpatterns = [
         name="staff-no-show",
     ),
     path(
+        "staff/bookings/<str:code>/done/",
+        queue_views.DoneView.as_view(),
+        name="staff-done",
+    ),
+    path(
         "staff/walk-ins/",
         staff_views.WalkInCreateView.as_view(),
         name="staff-walk-in",
+    ),
+    path("staff/queue/", queue_views.QueueView.as_view(), name="staff-queue"),
+    path(
+        "staff/queue/call-next/",
+        queue_views.CallNextView.as_view(),
+        name="staff-call-next",
     ),
 ]

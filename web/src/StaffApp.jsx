@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getResult, postJson } from './api'
+import ReceptionScreen from './ReceptionScreen.jsx'
 
 const pageStyle = {
-  maxWidth: 520,
+  maxWidth: 860,
   margin: '2rem auto',
   padding: '0 1rem',
   fontFamily: 'sans-serif',
   textAlign: 'left',
 }
+const formStyle = { maxWidth: 520 }
 const fieldStyle = {
   display: 'block',
   width: '100%',
@@ -60,6 +62,11 @@ function StaffApp() {
     return () => {
       ignore = true
     }
+  }, [])
+
+  const handleSessionEnded = useCallback(() => {
+    setUser(null)
+    setMessage('Your session has ended. Please sign in again.')
   }, [])
 
   async function handleLogin(event) {
@@ -121,61 +128,80 @@ function StaffApp() {
   }
 
   if (user) {
+    const isFrontDesk = user.role === 'admin' || user.role === 'receptionist'
     return (
       <main style={pageStyle}>
         <h1>ClinicQ</h1>
-        <h2>Staff</h2>
-        <p>
-          Signed in as <strong>{user.email}</strong>
-          <br />
-          Role: {ROLE_TEXT[user.role] || user.role}
-        </p>
-        {message && <p style={errorStyle}>{message}</p>}
-        <p>The reception and provider screens come in the next steps.</p>
-        <button
-          style={buttonStyle('#555', submitting)}
-          onClick={handleLogout}
-          disabled={submitting}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+          }}
         >
-          {submitting ? 'Signing out...' : 'Sign out'}
-        </button>
+          <p style={{ margin: 0 }}>
+            Signed in as <strong>{user.email}</strong> (
+            {ROLE_TEXT[user.role] || user.role})
+          </p>
+          <button
+            style={buttonStyle('#555', submitting)}
+            onClick={handleLogout}
+            disabled={submitting}
+          >
+            {submitting ? 'Signing out...' : 'Sign out'}
+          </button>
+        </div>
+        {message && <p style={errorStyle}>{message}</p>}
+
+        {isFrontDesk && <ReceptionScreen onSessionEnded={handleSessionEnded} />}
+        {user.role === 'provider' && (
+          <p>The provider screen, with the queue, comes in the next step.</p>
+        )}
       </main>
     )
   }
 
   return (
     <main style={pageStyle}>
-      <h1>ClinicQ</h1>
-      <h2>Staff sign in</h2>
-      <form onSubmit={handleLogin}>
-        <label style={labelStyle}>
-          Email
-          <input
-            style={fieldStyle}
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="username"
-          />
-        </label>
-        <label style={labelStyle}>
-          Password
-          <input
-            style={fieldStyle}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            maxLength={128}
-            autoComplete="current-password"
-          />
-        </label>
-        {message && <p style={errorStyle}>{message}</p>}
-        <button type="submit" style={buttonStyle('#1d4ed8', submitting)} disabled={submitting}>
-          {submitting ? 'Signing in...' : 'Sign in'}
-        </button>
-      </form>
+      <div style={formStyle}>
+        <h1>ClinicQ</h1>
+        <h2>Staff sign in</h2>
+        <form onSubmit={handleLogin}>
+          <label style={labelStyle}>
+            Email
+            <input
+              style={fieldStyle}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="username"
+            />
+          </label>
+          <label style={labelStyle}>
+            Password
+            <input
+              style={fieldStyle}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              maxLength={128}
+              autoComplete="current-password"
+            />
+          </label>
+          {message && <p style={errorStyle}>{message}</p>}
+          <button
+            type="submit"
+            style={buttonStyle('#1d4ed8', submitting)}
+            disabled={submitting}
+          >
+            {submitting ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
+      </div>
     </main>
   )
 }

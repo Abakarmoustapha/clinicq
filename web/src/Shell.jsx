@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import App from './App.jsx'
 import ManageBooking from './ManageBooking.jsx'
+import StaffApp from './StaffApp.jsx'
 
 function tabStyle(active) {
   return {
@@ -34,6 +35,9 @@ function Shell() {
         <button style={tabStyle(view === 'manage')} onClick={() => setView('manage')}>
           My booking
         </button>
+        <button style={tabStyle(view === 'staff')} onClick={() => setView('staff')}>
+          Staff
+        </button>
       </nav>
       <div hidden={view !== 'book'}>
         <App />
@@ -41,6 +45,7 @@ function Shell() {
       <div hidden={view !== 'manage'}>
         <ManageBooking />
       </div>
+      {view === 'staff' && <StaffApp />}
     </>
   )
 }

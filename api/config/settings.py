@@ -22,6 +22,13 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# While developing, trust the React development server (a different address from Django).
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",

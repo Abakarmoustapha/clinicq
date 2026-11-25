@@ -217,6 +217,7 @@ function ReceptionScreen({ onSessionEnded }) {
   const [day, setDay] = useState('')
   const [list, setList] = useState(null)
   const [serverToday, setServerToday] = useState(null)
+  const [updatedAt, setUpdatedAt] = useState(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState(null)
   const [busyCode, setBusyCode] = useState(null)
@@ -236,6 +237,7 @@ function ReceptionScreen({ onSessionEnded }) {
         if (requestId !== requestRef.current) return
         if (result.ok) {
           setList(result.body)
+          setUpdatedAt(new Date())
           setError('')
           if (!selectedDay) setServerToday(result.body.date)
         } else if (result.status === 401 || result.status === 403) {
@@ -253,6 +255,11 @@ function ReceptionScreen({ onSessionEnded }) {
     },
     [onSessionEnded],
   )
+
+  // The first load always asks for "today" so we learn the clinic's date from the server.
+  useEffect(() => {
+    if (serverToday === null && day !== '') load('')
+  }, [serverToday, day, load])
 
   useEffect(() => {
     load(day)
@@ -320,7 +327,10 @@ function ReceptionScreen({ onSessionEnded }) {
   }
 
   const shownDate = list ? list.date : day
-  const isToday = list !== null && serverToday !== null && list.date === serverToday
+  const known = list !== null && serverToday !== null
+  // Dates are written as YYYY-MM-DD, so comparing the text compares the days.
+  const isToday = known && list.date === serverToday
+  const isTodayOrPast = known && list.date <= serverToday
 
   return (
     <section>
@@ -344,6 +354,12 @@ function ReceptionScreen({ onSessionEnded }) {
         </button>
       </p>
 
+      {updatedAt && (
+        <p style={{ color: '#555', fontSize: '0.9rem', margin: '0 0 0.5rem' }}>
+          Last updated at {updatedAt.toLocaleTimeString()}
+        </p>
+      )}
+
       {error && <p style={errorStyle}>{error}</p>}
       {notice && (
         <p style={{ color: notice.ok ? '#166534' : 'crimson' }} aria-live="polite">
@@ -362,7 +378,9 @@ function ReceptionScreen({ onSessionEnded }) {
       {showWalkIn && <WalkInForm services={services} onAdded={handleAdded} />}
 
       {list === null && !error && <p>Loading...</p>}
-      {list && list.bookings.length === 0 && <p>No bookings on this day.</p>}
+      {list && list.bookings.length === 0 && (
+        <p>No bookings on {list.date}. Use the day box to look at another day.</p>
+      )}
       {list && list.bookings.length > 0 && (
         <p style={{ color: '#555' }}>
           {list.bookings.length} booking{list.bookings.length === 1 ? '' : 's'} on{' '}
@@ -396,15 +414,17 @@ function ReceptionScreen({ onSessionEnded }) {
               {b.service} with {b.provider}. Code {b.code}
             </div>
 
-            {b.status === 'booked' && isToday && (
+            {b.status === 'booked' && isTodayOrPast && (
               <div>
-                <button
-                  style={buttonStyle('#1d4ed8', busyCode === b.code)}
-                  disabled={busyCode !== null}
-                  onClick={() => act(b, 'check-in', 'checked in.')}
-                >
-                  Check in
-                </button>
+                {isToday && (
+                  <button
+                    style={buttonStyle('#1d4ed8', busyCode === b.code)}
+                    disabled={busyCode !== null}
+                    onClick={() => act(b, 'check-in', 'checked in.')}
+                  >
+                    Check in
+                  </button>
+                )}
                 <button
                   style={buttonStyle('#b45309', busyCode === b.code)}
                   disabled={busyCode !== null}

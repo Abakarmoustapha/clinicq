@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getResult, postJson } from './api'
+import ProviderScreen from './ProviderScreen.jsx'
 import ReceptionScreen from './ReceptionScreen.jsx'
 
 const pageStyle = {
@@ -157,7 +158,7 @@ function StaffApp() {
 
         {isFrontDesk && <ReceptionScreen onSessionEnded={handleSessionEnded} />}
         {user.role === 'provider' && (
-          <p>The provider screen, with the queue, comes in the next step.</p>
+          <ProviderScreen onSessionEnded={handleSessionEnded} />
         )}
       </main>
     )

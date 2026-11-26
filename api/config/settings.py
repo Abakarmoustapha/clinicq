@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "accounts",
     "scheduling",
+    "audit",
     "django.contrib.postgres",
 ]
 

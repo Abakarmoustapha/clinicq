@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
 from rest_framework.response import Response
@@ -5,6 +6,8 @@ from rest_framework.views import APIView
 
 from accounts.models import User
 from accounts.permissions import IsAnyStaff, IsProviderRole
+from audit.models import ActivityLog
+from audit.services import record
 
 from .bookings import BookingNotFound
 from .models import Booking, Provider
@@ -59,7 +62,9 @@ class CallNextView(APIView):
         if provider is None:
             return Response(NO_PROFILE, status=status.HTTP_409_CONFLICT)
         try:
-            booking = call_next(provider)
+            with transaction.atomic():
+                booking = call_next(provider)
+                record(ActivityLog.Action.CALLED, booking, request.user)
         except InvalidTransition as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         return Response(StaffBookingSerializer(booking).data)
@@ -70,7 +75,9 @@ class DoneView(APIView):
 
     def post(self, request, code):
         try:
-            booking = finish(bookings_for(request.user), code)
+            with transaction.atomic():
+                booking = finish(bookings_for(request.user), code)
+                record(ActivityLog.Action.FINISHED, booking, request.user)
         except BookingNotFound:
             return Response(
                 {"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND

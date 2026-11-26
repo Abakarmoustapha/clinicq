@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -8,6 +9,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+
+from audit.models import ActivityLog
+from audit.services import record
 
 from .availability import get_free_slots
 from .bookings import (
@@ -86,14 +90,17 @@ class BookingCreateView(PublicMixin, APIView):
         data.is_valid(raise_exception=True)
         values = data.validated_data
         try:
-            booking = create_booking(
-                provider=values["provider"],
-                service=values["service"],
-                start_at=values["start_at"],
-                patient_name=values["patient_name"],
-                patient_phone=values["patient_phone"],
-                patient_email=values["patient_email"],
-            )
+            # The booking and its log line are saved together, or not at all.
+            with transaction.atomic():
+                booking = create_booking(
+                    provider=values["provider"],
+                    service=values["service"],
+                    start_at=values["start_at"],
+                    patient_name=values["patient_name"],
+                    patient_phone=values["patient_phone"],
+                    patient_email=values["patient_email"],
+                )
+                record(ActivityLog.Action.BOOKING_CREATED, booking)
         except SlotUnavailable as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         except TooFarAhead as exc:
@@ -120,7 +127,9 @@ class BookingCancelView(PublicMixin, APIView):
         data = BookingCancelSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         try:
-            booking = cancel_booking(code, data.validated_data["patient_phone"])
+            with transaction.atomic():
+                booking = cancel_booking(code, data.validated_data["patient_phone"])
+                record(ActivityLog.Action.BOOKING_CANCELLED, booking)
         except BookingNotFound:
             return Response(
                 {"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND

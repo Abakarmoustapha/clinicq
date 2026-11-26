@@ -1,11 +1,14 @@
 from datetime import datetime, time, timedelta
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import IsAnyStaff, IsFrontDesk
+from audit.models import ActivityLog
+from audit.services import record
 
 from .bookings import BookingNotFound
 from .staff_serializers import (
@@ -46,9 +49,12 @@ class StaffBookingListView(APIView):
         return Response({"date": day.isoformat(), "bookings": data})
 
 
-def run_action(request, code, action):
+def run_action(request, code, action, log_action):
     try:
-        booking = action(bookings_for(request.user), code)
+        # The change and its log line are saved together, or not at all.
+        with transaction.atomic():
+            booking = action(bookings_for(request.user), code)
+            record(log_action, booking, request.user)
     except BookingNotFound:
         return Response(
             {"detail": "Booking not found."}, status=status.HTTP_404_NOT_FOUND
@@ -62,14 +68,14 @@ class CheckInView(APIView):
     permission_classes = [IsFrontDesk]
 
     def post(self, request, code):
-        return run_action(request, code, check_in)
+        return run_action(request, code, check_in, ActivityLog.Action.CHECKED_IN)
 
 
 class NoShowView(APIView):
     permission_classes = [IsFrontDesk]
 
     def post(self, request, code):
-        return run_action(request, code, mark_no_show)
+        return run_action(request, code, mark_no_show, ActivityLog.Action.NO_SHOW)
 
 
 class WalkInCreateView(APIView):
@@ -79,7 +85,9 @@ class WalkInCreateView(APIView):
         data = WalkInSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         try:
-            booking = create_walk_in(**data.validated_data)
+            with transaction.atomic():
+                booking = create_walk_in(**data.validated_data)
+                record(ActivityLog.Action.WALK_IN_ADDED, booking, request.user)
         except WalkInNotPossible as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         return Response(
